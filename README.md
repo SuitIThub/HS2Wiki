@@ -86,6 +86,7 @@ using HS2Wiki;
 using UnityEngine;
 
 [BepInPlugin("com.yourname.yourplugin", "Your Plugin", "1.0.0")]
+[BepInDependency("com.suit.hs2wiki", BepInDependency.DependencyFlags.SoftDependency)]
 public class YourPlugin : BaseUnityPlugin
 {
     private Texture2D _exampleImage;
