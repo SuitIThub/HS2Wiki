@@ -28,19 +28,59 @@ Press F3 (configurable) to open the wiki panel.
 
 You can add your own wiki pages to the central wiki system by following these steps:
 
-### 1. Add a reference to HS2Wiki
-
-In your plugin project, add a reference to `HS2Wiki.dll`.
-
-### 2. Register your wiki page
+### 1. Register your wiki page
 
 Use the public API to register your wiki pages. The simplest approach is:
 
 ```csharp
-using HS2Wiki;
-
 // Inside your plugin's Awake or Start method
-WikiPlugin.PublicAPI.RegisterPage("Your Category", "Your Page Name", YourDrawPageMethod);
+RegisterWikiPage("Your Category", "Your Page Name", YourDrawPageMethod);
+
+// Use this method to connect to the wiki plugin
+private void RegisterWikiPage(string category, string pageName, Action drawPageAction)
+{
+    Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
+    if (wikiPluginType == null)
+    {
+        Logger.LogWarning("Wiki Plugin nicht gefunden – Registrierung übersprungen.");
+        return;
+    }
+
+    // Try to find the PublicAPI field
+    FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
+    if (apiField == null)
+    {
+        Logger.LogWarning("Wiki API-Feld nicht gefunden – Registrierung übersprungen.");
+        return;
+    }
+
+    object apiInstance = apiField.GetValue(null);
+    if (apiInstance == null)
+    {
+        Logger.LogWarning("Wiki API ist null – Registrierung übersprungen.");
+        return;
+    }
+
+    // Try to find the RegisterPage method
+    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", new[] {
+        typeof(string), typeof(string), typeof(Action)
+    });
+
+    if (registerPageMethod == null)
+    {
+        Logger.LogWarning("RegisterPage-Methode nicht gefunden.");
+        return;
+    }
+
+    // Call up RegisterPage
+    registerPageMethod.Invoke(apiInstance, new object[] {
+        category,
+        pageName,
+        drawPageAction
+    });
+
+    Logger.LogInfo("Seite erfolgreich beim Wiki registriert.");
+}
 
 // Define the method that will draw your wiki page content
 private void YourDrawPageMethod()
@@ -65,7 +105,7 @@ private void YourDrawPageMethod()
 }
 ```
 
-### 3. Content Guidelines
+### 2. Content Guidelines
 
 Your wiki page can include:
 
@@ -76,13 +116,14 @@ Your wiki page can include:
 
 But pretty much everything Unity's GUI System can handle, can be included into your page :D
 
-### 4. Example
+It is good practice to use your pulgins title to prevent duplicate categories.
+
+### 3. Example
 
 Here's a complete example of how to register and implement a wiki page:
 
 ```csharp
 using BepInEx;
-using HS2Wiki;
 using UnityEngine;
 
 [BepInPlugin("com.yourname.yourplugin", "Your Plugin", "1.0.0")]
@@ -100,10 +141,55 @@ public class YourPlugin : BaseUnityPlugin
             _exampleImage = LoadYourImage();
             
             // Register your wiki page
-            WikiPlugin.PublicAPI.RegisterPage("Your Features", "Feature Guide", DrawWikiPage);
+            RegisterWikiPage("Category", "Feature Guide", DrawWikiPage);
         }
     }
     
+    private void RegisterWikiPage(string category, string pageName, Action drawPageAction)
+{
+    Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
+    if (wikiPluginType == null)
+    {
+        Logger.LogWarning("Wiki plugin not found - registration skipped.");
+        return;
+    }
+
+    // Try to find the PublicAPI field
+    FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
+    if (apiField == null)
+    {
+        Logger.LogWarning("Wiki API field not found - registration skipped.");
+        return;
+    }
+
+    object apiInstance = apiField.GetValue(null);
+    if (apiInstance == null)
+    {
+        Logger.LogWarning("Wiki API is null - registration skipped.");
+        return;
+    }
+
+    // Try to find the RegisterPage method
+    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", new[] {
+        typeof(string), typeof(string), typeof(Action)
+    });
+
+    if (registerPageMethod == null)
+    {
+        Logger.LogWarning("RegisterPage method not found.");
+        return;
+    }
+
+    // Call up RegisterPage
+    registerPageMethod.Invoke(apiInstance, new object[] {
+        category,
+        pageName,
+        drawPageAction
+    });
+
+    Logger.LogInfo("Page successfully registered with the wiki.");
+}
+
     private void DrawWikiPage()
     {
         GUILayout.Label("<b>Your Feature Guide</b>");
