@@ -1,0 +1,162 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Screencap</name>
+    </assembly>
+    <members>
+        <member name="M:Screencap.Hooks.StudioCapturePreHook">
+            <summary>
+            Cancel the vanilla screenshot
+            </summary>
+        </member>
+        <member name="P:Screencap.Hooks.CardRenderRate">
+            <summary> Chara card Render/Downsample rate.</summary>
+        </member>
+        <member name="M:Screencap.Hooks.CapturePrefix">
+            <summary>
+            Cancel the vanilla screenshot
+            </summary>
+        </member>
+        <member name="T:Screencap.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Screencap.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Screencap.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Screencap.Properties.Resources.blackout">
+            <summary>
+              Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="P:Screencap.Properties.Resources.EquirectangularConverter">
+            <summary>
+              Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="P:Screencap.Properties.Resources.rgalpha">
+            <summary>
+              Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="T:Screencap.ScreenshotManager">
+            <summary>
+            Plugin for taking high quality screenshots.
+            </summary>
+        </member>
+        <member name="E:Screencap.ScreenshotManager.OnPreCapture">
+            <summary>
+            Triggered before a screenshot is captured. For use by plugins adding screen effects incompatible with Screencap.
+            </summary>
+        </member>
+        <member name="E:Screencap.ScreenshotManager.OnPostCapture">
+            <summary>
+            Triggered after a screenshot is captured. For use by plugins adding screen effects incompatible with Screencap.
+            </summary>
+        </member>
+        <member name="M:Screencap.ScreenshotManager.Capture(System.Int32,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            Capture the screen into a texture based on supplied arguments. Remember to destroy the texture when done with it.
+            Can return null if there no 3D camera was found to take the picture with.
+            </summary>
+            <param name="width">Width of the resulting capture, after downscaling</param>
+            <param name="height">Height of the resulting capture, after downscaling</param>
+            <param name="downscaling">How much to oversize and then downscale. 1 for none.</param>
+            <param name="transparent">Should the capture be transparent</param>
+        </member>
+        <member name="M:Screencap.ScreenshotManager.ToggleCameraControllers(UnityEngine.Transform,System.Boolean)">
+            <summary>
+            Need to disable camera controllers because they prevent changes to position
+            </summary>
+        </member>
+        <member name="T:Screencap.I360Render">
+            <summary>
+            Code ported from https://github.com/yasirkula/Unity360ScreenshotCapture/
+            </summary>
+        </member>
+        <member name="F:BepisPlugins.Metadata.PluginsVersion">
+            <summary>
+            Version number used be all plugins. Must be convertible to <see cref="T:System.Version"/>
+            Use ReleaseVersion.HotfixVersion format
+            </summary>
+        </member>
+        <member name="M:Extensions.Replace(System.String,System.String,System.String,System.StringComparison)">
+            <summary>
+            Returns a new string in which all occurrences of a specified string in the current instance are replaced with another 
+            specified string according the type of search to use for the specified string.
+            Stolen from https://stackoverflow.com/a/45756981
+            </summary>
+            <param name="str">The string performing the replace method.</param>
+            <param name="oldValue">The string to be replaced.</param>
+            <param name="newValue">The string replace all occurrences of <paramref name="oldValue"/>. 
+            If value is equal to <c>null</c>, than all occurrences of <paramref name="oldValue"/> will be removed from the <paramref name="str"/>.</param>
+            <param name="comparisonType">One of the enumeration values that specifies the rules for the search.</param>
+            <returns>A string that is equivalent to the current string except that all instances of <paramref name="oldValue"/> are replaced with <paramref name="newValue"/>. 
+            If <paramref name="oldValue"/> is not found in the current instance, the method returns the current instance unchanged.</returns>
+        </member>
+        <member name="M:Extensions.FindPosition(System.IO.Stream,System.Byte[])">
+            <summary>
+            Find first position of the byte sequence in the stream starting at current position.
+            Returns position of first byte of the sequence.
+            https://stackoverflow.com/questions/1550560/encoding-an-integer-in-7-bit-format-of-c-sharp-binaryreader-readstring
+            </summary>
+        </member>
+        <member name="T:Shared.IMGUIUtils">
+            <summary>
+            Utility methods for working with IMGUI / OnGui.
+            </summary>
+        </member>
+        <member name="M:Shared.IMGUIUtils.DrawSolidBox(UnityEngine.Rect)">
+            <summary>
+            Draw a gray non-transparent GUI.Box at the specified rect. Use before a GUI.Window or other controls to get rid of 
+            the default transparency and make the GUI easier to read.
+            <example>
+            IMGUIUtils.DrawSolidBox(screenRect);
+            GUILayout.Window(362, screenRect, TreeWindow, "Select character folder");
+            </example>
+            </summary>
+        </member>
+        <member name="M:Shared.IMGUIUtils.EatInputInRect(UnityEngine.Rect)">
+            <summary>
+            Block input from going through to the game/canvases if the mouse cursor is within the specified Rect.
+            Use after a GUI.Window call or the window will not be able to get the inputs either.
+            <example>
+            GUILayout.Window(362, screenRect, TreeWindow, "Select character folder");
+            Utils.EatInputInRect(screenRect);
+            </example>
+            </summary>
+            <param name="eatRect"></param>
+        </member>
+        <member name="M:Shared.IMGUIUtils.DrawLabelWithOutline(UnityEngine.Rect,System.String,UnityEngine.GUIStyle,UnityEngine.Color,UnityEngine.Color,System.Int32)">
+            <summary>
+            Draw a label with an outline
+            </summary>
+            <param name="rect">Size of the control</param>
+            <param name="text">Text of the label</param>
+            <param name="style">Style to be applied to the label</param>
+            <param name="txtColor">Color of the text</param>
+            <param name="outlineColor">Color of the outline</param>
+            <param name="outlineThickness">Thickness of the outline in pixels</param>
+        </member>
+        <member name="M:Shared.IMGUIUtils.DrawLabelWithShadow(UnityEngine.Rect,UnityEngine.GUIContent,UnityEngine.GUIStyle,UnityEngine.Color,UnityEngine.Color,UnityEngine.Vector2)">
+            <summary>
+            Draw a label with a shadow
+            </summary>        
+            <param name="rect">Size of the control</param>
+            <param name="content">Contents of the label</param>
+            <param name="style">Style to be applied to the label</param>
+            <param name="txtColor">Color of the outline</param>
+            <param name="shadowColor">Color of the text</param>
+            <param name="shadowOffset">Offset of the shadow in pixels</param>
+        </member>
+    </members>
+</doc>

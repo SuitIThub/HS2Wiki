@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="IllusionLibsAIGirlUnityEngineUI" AfterTargets="ResolveReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'IllusionLibs.AIGirl.UnityEngine.UI'" />
+    </ItemGroup>
+  </Target>
+</Project>

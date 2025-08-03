@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="IllusionLibsKoikatsuSunshineUnityEnginePhysicsModule" AfterTargets="ResolveReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'IllusionLibs.KoikatsuSunshine.UnityEngine.PhysicsModule'" />
+    </ItemGroup>
+  </Target>
+</Project>

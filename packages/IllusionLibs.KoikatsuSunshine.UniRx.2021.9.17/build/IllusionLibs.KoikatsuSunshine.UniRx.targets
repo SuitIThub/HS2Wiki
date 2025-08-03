@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="IllusionLibsKoikatsuSunshineUniRx" AfterTargets="ResolveReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'IllusionLibs.KoikatsuSunshine.UniRx'" />
+    </ItemGroup>
+  </Target>
+</Project>
