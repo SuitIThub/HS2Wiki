@@ -18,6 +18,7 @@ public class WikiPlugin : BaseUnityPlugin
     internal static new ManualLogSource Logger;
     private Rect _windowRect = new Rect(100, 100, 600, 400);
     private Vector2 _scrollPosition;
+    private Vector2 _sidebarScrollPosition;
     private WikiAPI.PageInfo _selectedPage;
     private Dictionary<string, bool> _categoryFoldouts;
 
@@ -29,6 +30,9 @@ public class WikiPlugin : BaseUnityPlugin
     private string imagePath = Path.Combine(Paths.PluginPath, "HS2Wiki", "example.png");
 
     private bool _uiShow;
+    private bool _isResizing = false;
+    private Vector2 _resizeStartPosition;
+    private Vector2 _originalSize;
 
     public static ConfigEntry<KeyboardShortcut> KeyGui { get; private set; }
 
@@ -73,11 +77,22 @@ public class WikiPlugin : BaseUnityPlugin
 
     private void DrawWindow(int id)
     {
-       
+        // Define resize button style
+        GUIStyle resizeButtonStyle = new GUIStyle(GUI.skin.button);
+        resizeButtonStyle.padding = new RectOffset(0, 0, 0, 0);
+        resizeButtonStyle.margin = new RectOffset(0, 0, 0, 0);
+        
         GUILayout.BeginHorizontal();
 
         // Seitenleiste mit Kategorien
-        GUILayout.BeginVertical(GUILayout.Width(150));
+        // Fixed width vertical layout for the sidebar
+        GUILayout.BeginVertical(GUILayout.Width(150), GUILayout.ExpandHeight(true));
+        
+        // Add a scrollview for the categories
+        _sidebarScrollPosition = GUILayout.BeginScrollView(_sidebarScrollPosition, false, true, GUILayout.ExpandHeight(true));
+        
+        // Create a containing non-expanding vertical group for category content
+        GUILayout.BeginVertical(GUILayout.ExpandHeight(false));
         
         // Gruppieren nach Kategorie
         var pagesByCategory = WikiPlugin.PublicAPI.GetPages()
@@ -94,30 +109,53 @@ public class WikiPlugin : BaseUnityPlugin
             }
         }
         
+        // Style für Kategorie-Überschriften
+        GUIStyle categoryStyle = new GUIStyle(GUI.skin.GetStyle("foldout"));
+        categoryStyle.normal.textColor = Color.white;
+        categoryStyle.onNormal.textColor = Color.white;
+        categoryStyle.fontStyle = FontStyle.Bold;
+        categoryStyle.margin = new RectOffset(0, 0, 0, 0);
+        categoryStyle.padding = new RectOffset(0, 0, 0, 0);
+        
+        // Style for buttons to reduce padding
+        GUIStyle compactButton = new GUIStyle(GUI.skin.button);
+        compactButton.margin = new RectOffset(0, 0, 0, 0);
+        compactButton.padding = new RectOffset(5, 5, 2, 2);
+        
         // Für jede Kategorie eine faltbare Gruppe anzeigen
         foreach (var category in pagesByCategory.Keys.OrderBy(k => k))
         {
-            // Faltbarer Header für die Kategorie
+            GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
+            
+            // Faltbarer Header mit Pfeilsymbol für die Kategorie
             _categoryFoldouts[category] = GUILayout.Toggle(
                 _categoryFoldouts[category], 
-                category, 
-                GUI.skin.GetStyle("foldout"));
+                (_categoryFoldouts[category] ? "▼ " : "► ") + category,
+                categoryStyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
+                
+            GUILayout.EndHorizontal();
                 
             // Wenn ausgeklappt, zeige alle Seiten dieser Kategorie
             if (_categoryFoldouts[category])
             {
-                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
                 foreach (var page in pagesByCategory[category])
                 {
-                    if (GUILayout.Button(page.PageName))
+                    if (GUILayout.Button(page.PageName, compactButton, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false)))
                     {
                         _selectedPage = page;
                     }
                 }
                 GUILayout.EndVertical();
             }
+            
+            GUILayout.Space(2); // Reduced spacing between categories
         }
         
+        // End the non-expanding content group
+        GUILayout.EndVertical();
+        
+        GUILayout.EndScrollView();
         GUILayout.EndVertical();
 
         // Page Content
@@ -129,31 +167,80 @@ public class WikiPlugin : BaseUnityPlugin
 
         GUILayout.EndHorizontal();
         
+        // Draw resize button in the bottom-right corner
+        Rect resizeBtnRect = new Rect(_windowRect.width - 20, _windowRect.height - 20, 16, 16);
+        GUI.Box(resizeBtnRect, "↘", resizeButtonStyle);
+        
+        // Handle resize button dragging
+        HandleResizeButton(resizeBtnRect);
+        
         // Only use DragWindow for the title bar area
         GUI.DragWindow(new Rect(0, 0, _windowRect.width, 20));
         IMGUIUtils.EatInputInRect(_windowRect);
     }
 
+    private void HandleResizeButton(Rect resizeBtnRect)
+    {
+        Event currentEvent = Event.current;
+        Vector2 mousePos = currentEvent.mousePosition;
+        
+        switch (currentEvent.type)
+        {
+            case EventType.MouseDown:
+                if (resizeBtnRect.Contains(mousePos))
+                {
+                    _isResizing = true;
+                    _resizeStartPosition = mousePos;
+                    _originalSize = new Vector2(_windowRect.width, _windowRect.height);
+                    currentEvent.Use();
+                }
+                break;
+                
+            case EventType.MouseUp:
+                if (_isResizing)
+                {
+                    _isResizing = false;
+                    currentEvent.Use();
+                }
+                break;
+                
+            case EventType.MouseDrag:
+                if (_isResizing)
+                {
+                    // Calculate the new size based on mouse movement
+                    float width = Mathf.Max(300, _originalSize.x + (mousePos.x - _resizeStartPosition.x));
+                    float height = Mathf.Max(200, _originalSize.y + (mousePos.y - _resizeStartPosition.y));
+                    
+                    // Apply the new size
+                    _windowRect.width = width;
+                    _windowRect.height = height;
+                    
+                    currentEvent.Use();
+                }
+                break;
+        }
+    }
+
     private void DrawDemoPage()
     {
-        GUILayout.Label("<b>Das ist eine Beispielseite für das Wiki.</b>");
+        GUILayout.Label("<b>This is an example page for the wiki.</b>");
         GUILayout.Space(10);
 
-        GUILayout.Label("Du kannst:");
-        GUILayout.Label("✅ Text anzeigen");
-        GUILayout.Label("✅ Buttons verwenden");
-        GUILayout.Label("✅ Scrollbare Inhalte verwenden");
-        GUILayout.Label("✅ Bilder anzeigen");
+        GUILayout.Label("You can:");
+        GUILayout.Label("✅ Show text");
+        GUILayout.Label("✅ Use buttons");
+        GUILayout.Label("✅ Use scrollable content");
+        GUILayout.Label("✅ Show images");
 
         GUILayout.Space(10);
 
-        if (GUILayout.Button("Klick mich!"))
+        if (GUILayout.Button("Click me!"))
         {
-            Logger.LogInfo("Button wurde in der Beispielseite geklickt!");
+            Logger.LogInfo("Button was clicked in the example page!");
         }
 
         GUILayout.Space(20);
-        GUILayout.Label("Bild-Beispiel:");
+        GUILayout.Label("Image example:");
 
         if (exampleImage != null)
         {
@@ -161,14 +248,14 @@ public class WikiPlugin : BaseUnityPlugin
         }
         else
         {
-            GUILayout.Label("Kein Bild gefunden. Lege eine PNG-Datei unter:");
+            GUILayout.Label("No image found. Place a PNG file under:");
             GUILayout.Label(imagePath);
         }
 
         GUILayout.Space(10);
 
-        GUILayout.Label("🎞️ Video oder GIFs in Unity GUI sind schwieriger...");
-        GUILayout.Label("Nutze ggf. ein externes Plugin oder HTML/Asset-Browser-Fenster.");
+        GUILayout.Label("🎞️ Video or GIFs in Unity GUI are more difficult...");
+        GUILayout.Label("Use an external plugin or HTML/asset browser window if necessary.");
     }
 
 }
