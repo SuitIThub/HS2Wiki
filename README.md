@@ -1,6 +1,6 @@
 # HS2 Wiki Plugin
 
-[![Latest Release](https://img.shields.io/github/v/release/SuitIThub/HS2Wiki)](https://github.com/Suit-Ji/HS2Wiki/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/SuitIThub/HS2Wiki)](https://github.com/SuitIThub/HS2Wiki/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![BepInEx](https://img.shields.io/badge/BepInEx-5.4.22-green)](https://github.com/BepInEx/BepInEx)
 
