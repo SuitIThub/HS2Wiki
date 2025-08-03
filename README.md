@@ -74,6 +74,8 @@ Your wiki page can include:
 - Images (Texture2D objects)
 - Scrollable content (the wiki system handles scrolling automatically)
 
+But pretty much everything Unity's GUI System can handle, can be included into your page :D
+
 ### 4. Example
 
 Here's a complete example of how to register and implement a wiki page:
