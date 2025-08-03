@@ -42,7 +42,7 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
     Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
     if (wikiPluginType == null)
     {
-        Logger.LogWarning("Wiki Plugin nicht gefunden – Registrierung übersprungen.");
+        Logger.LogWarning("Wiki plugin not found - registration skipped.");
         return;
     }
 
@@ -50,14 +50,14 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
     FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
     if (apiField == null)
     {
-        Logger.LogWarning("Wiki API-Feld nicht gefunden – Registrierung übersprungen.");
+        Logger.LogWarning("Wiki API field not found - registration skipped.");
         return;
     }
 
     object apiInstance = apiField.GetValue(null);
     if (apiInstance == null)
     {
-        Logger.LogWarning("Wiki API ist null – Registrierung übersprungen.");
+        Logger.LogWarning("Wiki API is null - registration skipped.");
         return;
     }
 
@@ -68,7 +68,7 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
 
     if (registerPageMethod == null)
     {
-        Logger.LogWarning("RegisterPage-Methode nicht gefunden.");
+        Logger.LogWarning("RegisterPage method not found.");
         return;
     }
 
@@ -79,7 +79,7 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
         drawPageAction
     });
 
-    Logger.LogInfo("Seite erfolgreich beim Wiki registriert.");
+    Logger.LogInfo("Page successfully registered with the wiki.");
 }
 
 // Define the method that will draw your wiki page content
