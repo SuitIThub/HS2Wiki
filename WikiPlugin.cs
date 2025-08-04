@@ -9,6 +9,7 @@ using HS2Wiki.api;
 using KKAPI;
 using KKAPI.Utilities;
 using UnityEngine;
+using HS2Wiki.docs;
 
 namespace HS2Wiki;
 
@@ -16,7 +17,7 @@ namespace HS2Wiki;
 public class WikiPlugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
-    private Rect _windowRect = new Rect(100, 100, 600, 400);
+    private Rect _windowRect = new Rect(100, 100, 1280, 720);
     private Vector2 _scrollPosition;
     private Vector2 _sidebarScrollPosition;
     private WikiAPI.PageInfo _selectedPage;
@@ -50,14 +51,10 @@ public class WikiPlugin : BaseUnityPlugin
                 new KeyboardShortcut(KeyCode.F3),
                 new ConfigDescription("Open the wiki window."));
 
-        if (File.Exists(imagePath))
-        {
-            byte[] data = File.ReadAllBytes(imagePath);
-            exampleImage = new Texture2D(2, 2);
-            exampleImage.LoadImage(data);
-        }
+        exampleImage = "example.png".LoadTexture();
 
         WikiPlugin.PublicAPI?.RegisterPage("Beispiele", "GUI-Demo", DrawDemoPage);
+        BetterPenetration.Init();
     }
     private void Update()
     {
