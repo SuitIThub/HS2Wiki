@@ -17,7 +17,7 @@
       https://nuget.samboy.dev/v3/index.json
     </RestoreAdditionalProjectSources>
     <RootNamespace>HS2Wiki</RootNamespace>
-    <Company>Suit-Ji</Company>
+    <Company>https://github.com/SuitIThub/HS2Wiki</Company>
     <Authors>Suit-Ji</Authors>
     <Title>HS2Wiki</Title>
     <RepositoryUrl>https://github.com/SuitIThub/HS2Wiki</RepositoryUrl>
@@ -26,6 +26,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Description>A BepInEx plugin for Honey Select 2 that adds an in-game wiki system for documenting game features.</Description>
   </PropertyGroup>
 
   <ItemGroup>

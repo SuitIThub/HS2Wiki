@@ -13,10 +13,11 @@ using UnityEngine;
 namespace HS2Wiki;
 
 [BepInPlugin("com.suit.hs2wiki", "HS2 Wiki", "1.0.0")]
+[BepInProcess("StudioNEOV2")]
 public class WikiPlugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
-    private Rect _windowRect = new Rect(100, 100, 600, 400);
+    private Rect _windowRect = new Rect(100, 100, 1280, 720);
     private Vector2 _scrollPosition;
     private Vector2 _sidebarScrollPosition;
     private WikiAPI.PageInfo _selectedPage;
