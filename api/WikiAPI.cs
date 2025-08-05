@@ -16,6 +16,13 @@ namespace HS2Wiki.api
         }
 
         private readonly List<PageInfo> _pages = new();
+        private WikiPlugin _plugin;
+
+        // Referenz auf das Plugin speichern
+        public void Initialize(WikiPlugin plugin)
+        {
+            _plugin = plugin;
+        }
 
         public void RegisterPage(string category, string name, Action contentCallback)
         {
@@ -25,6 +32,9 @@ namespace HS2Wiki.api
                 PageName = name,
                 PageContentCallback = contentCallback
             });
+            
+            // Nach Registrierung einer neuen Seite den Kategoriebaum neu erstellen
+            _plugin?.RebuildCategoryTree();
         }
 
         public IReadOnlyList<PageInfo> GetPages() => _pages;

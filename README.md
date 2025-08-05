@@ -126,7 +126,7 @@ Here's a complete example of how to register and implement a wiki page:
 using BepInEx;
 using UnityEngine;
 
-[BepInPlugin("com.yourname.yourplugin", "Your Plugin", "1.0.0")]
+[BepInPlugin("com.yourname.yourplugin", "Your Plugin", "1.1.0")]
 [BepInDependency("com.suit.hs2wiki", BepInDependency.DependencyFlags.HardDependency)]
 public class YourPlugin : BaseUnityPlugin
 {

@@ -12,16 +12,17 @@ using UnityEngine;
 
 namespace HS2Wiki;
 
-[BepInPlugin("com.suit.hs2wiki", "HS2 Wiki", "1.0.0")]
+[BepInPlugin("com.suit.hs2wiki", "HS2 Wiki", "1.1.0")]
 [BepInProcess("StudioNEOV2")]
 public class WikiPlugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
-    private Rect _windowRect = new Rect(100, 100, 1280, 720);
+    private Rect _windowRect = new Rect(100, 100, 1630, 720);
     private Vector2 _scrollPosition;
     private Vector2 _sidebarScrollPosition;
     private WikiAPI.PageInfo _selectedPage;
     private Dictionary<string, bool> _categoryFoldouts;
+    private Dictionary<string, List<string>> _categoryTree;
 
     private const int _uniqueId = ('V' << 24) | ('I' << 16) | ('D' << 8) | 'E';
 
@@ -43,7 +44,9 @@ public class WikiPlugin : BaseUnityPlugin
         Logger = base.Logger;
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
+        // API initialisieren
         PublicAPI = new WikiAPI();
+        PublicAPI.Initialize(this);
         Logger.LogInfo("Wiki API bereitgestellt!");
 
         KeyGui = Config.Bind(
@@ -59,6 +62,17 @@ public class WikiPlugin : BaseUnityPlugin
         }
 
         WikiPlugin.PublicAPI?.RegisterPage("Beispiele", "GUI-Demo", DrawDemoPage);
+    }
+    
+    // Kategoriebaum bei Bedarf neu erstellen
+    public void RebuildCategoryTree()
+    {
+        var pages = PublicAPI.GetPages();
+        var pagesByCategory = pages
+            .GroupBy(p => p.Category)
+            .ToDictionary(g => g.Key, g => g.ToList());
+            
+        BuildCategoryTree(pagesByCategory);
     }
     private void Update()
     {
@@ -87,7 +101,7 @@ public class WikiPlugin : BaseUnityPlugin
 
         // Seitenleiste mit Kategorien
         // Fixed width vertical layout for the sidebar
-        GUILayout.BeginVertical(GUILayout.Width(150), GUILayout.ExpandHeight(true));
+        GUILayout.BeginVertical(GUILayout.Width(300), GUILayout.ExpandHeight(true));
         
         // Add a scrollview for the categories
         _sidebarScrollPosition = GUILayout.BeginScrollView(_sidebarScrollPosition, false, true, GUILayout.ExpandHeight(true));
@@ -100,15 +114,7 @@ public class WikiPlugin : BaseUnityPlugin
             .GroupBy(p => p.Category)
             .ToDictionary(g => g.Key, g => g.ToList());
             
-        // Faltbare Zustandspeicherung initialisieren, falls noch nicht existiert
-        if (_categoryFoldouts == null)
-        {
-            _categoryFoldouts = new Dictionary<string, bool>();
-            foreach (var category in pagesByCategory.Keys)
-            {
-                _categoryFoldouts[category] = true; // Standardmäßig ausgeklappt
-            }
-        }
+        // Die Faltungszustände werden jetzt in BuildCategoryTree() initialisiert
         
         // Style für Kategorie-Überschriften
         GUIStyle categoryStyle = new GUIStyle(GUI.skin.GetStyle("foldout"));
@@ -123,36 +129,26 @@ public class WikiPlugin : BaseUnityPlugin
         compactButton.margin = new RectOffset(0, 0, 0, 0);
         compactButton.padding = new RectOffset(5, 5, 2, 2);
         
-        // Für jede Kategorie eine faltbare Gruppe anzeigen
-        foreach (var category in pagesByCategory.Keys.OrderBy(k => k))
+        // Zeige alle Hauptkategorien an
+        if (_categoryTree != null)
         {
-            GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
+            var rootCategories = _categoryTree.Keys
+                .Where(k => !k.Contains('/'))
+                .OrderBy(k => k)
+                .ToList();
             
-            // Faltbarer Header mit Pfeilsymbol für die Kategorie
-            _categoryFoldouts[category] = GUILayout.Toggle(
-                _categoryFoldouts[category], 
-                (_categoryFoldouts[category] ? "▼ " : "► ") + category,
-                categoryStyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
-                
-            GUILayout.EndHorizontal();
-                
-            // Wenn ausgeklappt, zeige alle Seiten dieser Kategorie
-            if (_categoryFoldouts[category])
+            foreach (var rootCategory in rootCategories)
             {
-                GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false));
-                foreach (var page in pagesByCategory[category])
-                {
-                    if (GUILayout.Button(page.PageName, compactButton, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(false)))
-                    {
-                        _selectedPage = page;
-                    }
-                }
-                GUILayout.EndVertical();
+                DrawCategoryWithSubcategories(rootCategory, "", pagesByCategory, categoryStyle, compactButton, 0);
             }
-            
-            GUILayout.Space(2); // Reduced spacing between categories
+        }
+        else
+        {
+            // Falls der Kategoriebaum noch nicht initialisiert wurde
+            GUILayout.Label("Keine Kategorien gefunden oder Baum wurde noch nicht initialisiert.");
         }
         
+        GUILayout.FlexibleSpace();
         // End the non-expanding content group
         GUILayout.EndVertical();
         
@@ -220,6 +216,129 @@ public class WikiPlugin : BaseUnityPlugin
                 }
                 break;
         }
+    }
+
+    // Baut eine Baumstruktur aus den Kategorien auf
+    private void BuildCategoryTree(Dictionary<string, List<WikiAPI.PageInfo>> pagesByCategory)
+    {
+        _categoryTree = new Dictionary<string, List<string>>();
+        
+        // Initialisiere die Faltouts für alle Kategorien, wenn sie noch nicht existieren
+        if (_categoryFoldouts == null)
+        {
+            _categoryFoldouts = new Dictionary<string, bool>();
+        }
+        
+        // Alle Kategorien durchlaufen und die Hierarchie aufbauen
+        foreach (var fullCategory in pagesByCategory.Keys)
+        {
+            // Stellen Sie sicher, dass die Kategorie im Faltout-Dictionary existiert
+            if (!_categoryFoldouts.ContainsKey(fullCategory))
+            {
+                _categoryFoldouts[fullCategory] = true; // Standardmäßig ausgeklappt
+            }
+            
+            // Alle Teile der Kategoriehierarchie verarbeiten
+            string currentPath = "";
+            string[] parts = fullCategory.Split('/');
+            
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string parentPath = currentPath;
+                
+                // Aktuellen Pfad aufbauen
+                if (i == 0)
+                    currentPath = parts[i];
+                else
+                    currentPath = $"{currentPath}/{parts[i]}";
+                
+                // Stellen Sie sicher, dass der aktuelle Pfad im Baum existiert
+                if (!_categoryTree.ContainsKey(currentPath))
+                {
+                    _categoryTree[currentPath] = new List<string>();
+                }
+                
+                // Stellen Sie sicher, dass der aktuelle Pfad im Faltout-Dictionary existiert
+                if (!_categoryFoldouts.ContainsKey(currentPath))
+                {
+                    _categoryFoldouts[currentPath] = true;
+                }
+                
+                // Wenn es sich nicht um die Wurzelkategorie handelt, fügen Sie sie als Unterkategorie zur übergeordneten Kategorie hinzu
+                if (i > 0 && !string.IsNullOrEmpty(parentPath) && !_categoryTree[parentPath].Contains(currentPath))
+                {
+                    _categoryTree[parentPath].Add(currentPath);
+                }
+            }
+        }
+    }
+    
+    // Zeichnet eine Kategorie mit all ihren Unterkategorien rekursiv
+    private void DrawCategoryWithSubcategories(string category, string displayName, 
+        Dictionary<string, List<WikiAPI.PageInfo>> pagesByCategory, 
+        GUIStyle categoryStyle, GUIStyle buttonStyle, int indentLevel)
+    {
+        // Wenn ein Anzeigename angegeben wurde, verwenden Sie diesen, andernfalls den Kategorienamen
+        string categoryName = string.IsNullOrEmpty(displayName) ? category : displayName;
+        
+        // Den letzten Teil des Kategoriepfads extrahieren, wenn es sich um einen verschachtelten Pfad handelt
+        if (string.IsNullOrEmpty(displayName))
+        {
+            string[] parts = category.Split('/');
+            categoryName = parts[parts.Length - 1];
+        }
+        
+        // Einrückung basierend auf der Ebene
+        GUILayout.BeginVertical(GUI.skin.box);
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(indentLevel * 15); // 15 Pixel Einrückung pro Ebene
+        
+        // Faltbarer Header mit Pfeilsymbol für die Kategorie
+        _categoryFoldouts[category] = GUILayout.Toggle(
+            _categoryFoldouts[category], 
+            (_categoryFoldouts[category] ? "▼ " : "► ") + categoryName,
+            categoryStyle, GUILayout.ExpandWidth(true));
+            
+        GUILayout.EndHorizontal();
+            
+        // Wenn ausgeklappt, zeige alle Seiten und Unterkategorien
+        if (_categoryFoldouts[category])
+        {
+            // Zeige zunächst direkte Seiten dieser Kategorie an (wenn vorhanden)
+            if (pagesByCategory.ContainsKey(category) && pagesByCategory[category].Count > 0)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space((indentLevel + 1) * 15);
+                GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandWidth(true));
+                
+                foreach (var page in pagesByCategory[category])
+                {
+                    if (GUILayout.Button(page.PageName, buttonStyle, GUILayout.ExpandWidth(true)))
+                    {
+                        _selectedPage = page;
+                    }
+                }
+                
+                GUILayout.EndVertical();
+                GUILayout.EndHorizontal();
+            }
+            
+            // Dann alle Unterkategorien anzeigen (wenn vorhanden)
+            if (_categoryTree.ContainsKey(category) && _categoryTree[category].Count > 0)
+            {
+                foreach (var subCategory in _categoryTree[category].OrderBy(c => c))
+                {
+                    DrawCategoryWithSubcategories(subCategory, null, pagesByCategory, categoryStyle, buttonStyle, indentLevel + 1);
+                }
+            }
+        }
+        
+        // Füge etwas Abstand zwischen den Kategorien hinzu, aber nur für die äußerste Ebene
+        if (indentLevel == 0)
+        {
+            GUILayout.Space(2);
+        }
+        GUILayout.EndVertical();
     }
 
     private void DrawDemoPage()
