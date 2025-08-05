@@ -11,7 +11,7 @@ A plugin for Honey Select 2 that provides an in-game wiki system. This plugin al
 ## Features
 
 - In-game wiki accessible via a hotkey (default: F3)
-- Category-based organization of wiki pages
+- Category-based organization of wiki pages with unlimited subcategory depth
 - Support for text, buttons, and images in wiki pages
 - Scrollable content for detailed documentation
 
@@ -35,6 +35,8 @@ Use the public API to register your wiki pages. The simplest approach is:
 ```csharp
 // Inside your plugin's Awake or Start method
 RegisterWikiPage("Your Category", "Your Page Name", YourDrawPageMethod);
+// For subcategories, use a forward slash separator
+RegisterWikiPage("Your Category/Subcategory", "Your Page Name", YourDrawPageMethod);
 
 // Use this method to connect to the wiki plugin
 private void RegisterWikiPage(string category, string pageName, Action drawPageAction)
@@ -116,7 +118,7 @@ Your wiki page can include:
 
 But pretty much everything Unity's GUI System can handle, can be included into your page :D
 
-It is good practice to use your pulgins title to prevent duplicate categories.
+It is good practice to use your plugin's title to prevent duplicate categories. You can also organize your content hierarchically using subcategories.
 
 ### 3. Example
 
@@ -140,8 +142,10 @@ public class YourPlugin : BaseUnityPlugin
             // Load your image
             _exampleImage = LoadYourImage();
             
-            // Register your wiki page
-            RegisterWikiPage("Category", "Feature Guide", DrawWikiPage);
+            // Register your wiki pages with categories and subcategories
+            RegisterWikiPage("YourPlugin", "Feature Guide", DrawWikiPage);
+            RegisterWikiPage("YourPlugin/Basics", "Getting Started", DrawBasicsPage);
+            RegisterWikiPage("YourPlugin/Advanced", "Advanced Techniques", DrawAdvancedPage);
         }
     }
     
@@ -221,11 +225,22 @@ public class YourPlugin : BaseUnityPlugin
 
 ## Tips for Wiki Content
 
-- Keep your wiki content organized by categories
+- Keep your wiki content organized by categories and subcategories
 - Use clear, descriptive page names
+- Use subcategories with the format "Category/Subcategory/SubSubcategory" for better organization
 - Include visual examples when possible
 - For complex features, consider adding step-by-step guides
 - Test your wiki pages to ensure they display correctly
+
+## Category Hierarchy
+
+The wiki now supports unlimited category nesting depth using the forward slash (/) as a separator:
+
+- Simple category: `"YourPlugin"`
+- Subcategory: `"YourPlugin/Features"`
+- Nested subcategories: `"YourPlugin/Features/Advanced/Special"`
+
+Each level in the hierarchy is automatically displayed with proper indentation and can be expanded or collapsed independently. This allows for much better organization of complex documentation.
 
 ## License
 
