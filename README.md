@@ -14,6 +14,9 @@ A plugin for Honey Select 2 that provides an in-game wiki system. This plugin al
 - Category-based organization of wiki pages with unlimited subcategory depth
 - Support for text, buttons, and images in wiki pages
 - Scrollable content for detailed documentation
+- Programmatic navigation between wiki pages
+- Image viewer with automatic scaling
+- Persistent category foldout state
 
 ## Installation
 
@@ -38,25 +41,43 @@ RegisterWikiPage("Your Category", "Your Page Name", YourDrawPageMethod);
 // For subcategories, use a forward slash separator
 RegisterWikiPage("Your Category/Subcategory", "Your Page Name", YourDrawPageMethod);
 
-// Use this method to connect to the wiki plugin
-private void RegisterWikiPage(string category, string pageName, Action drawPageAction)
+// You can also programmatically open wiki pages
+OpenWikiPage("Your Category", "Your Page Name");
+
+// And display images in a resizable, draggable viewer
+OpenImagePage("path/to/your/image.png");
+
+
+private static object apiInstance {
+    get{
+        Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
+        if (wikiPluginType == null)
+        {
+            Logger.LogWarning("Wiki plugin not found - registration skipped.");
+            return null;
+        }
+
+        // Try to find the PublicAPI field
+        FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
+        if (apiField == null)
+        {
+            Logger.LogWarning("Wiki API field not found - registration skipped.");
+            return null;
+        }
+
+        object apiInstance = apiField.GetValue(null);
+        if (apiInstance == null)
+        {
+            Logger.LogWarning("Wiki API is null - registration skipped.");
+            return null;
+        }
+        return apiInstance;
+    }
+}
+
+public static void RegisterWikiPage(string category, string pageName, Action drawPageAction)
 {
-    Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
-    if (wikiPluginType == null)
-    {
-        Logger.LogWarning("Wiki plugin not found - registration skipped.");
-        return;
-    }
-
-    // Try to find the PublicAPI field
-    FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
-    if (apiField == null)
-    {
-        Logger.LogWarning("Wiki API field not found - registration skipped.");
-        return;
-    }
-
-    object apiInstance = apiField.GetValue(null);
+    object apiInstance = WikiContent.apiInstance;
     if (apiInstance == null)
     {
         Logger.LogWarning("Wiki API is null - registration skipped.");
@@ -64,9 +85,9 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
     }
 
     // Try to find the RegisterPage method
-    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", new[] {
+    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", [
         typeof(string), typeof(string), typeof(Action)
-    });
+    ]);
 
     if (registerPageMethod == null)
     {
@@ -75,13 +96,65 @@ private void RegisterWikiPage(string category, string pageName, Action drawPageA
     }
 
     // Call up RegisterPage
-    registerPageMethod.Invoke(apiInstance, new object[] {
+    registerPageMethod.Invoke(apiInstance, [
         category,
         pageName,
         drawPageAction
-    });
+    ]);
 
     Logger.LogInfo("Page successfully registered with the wiki.");
+}
+
+public static void OpenWikiPage(string category, string pageName)
+{
+    object apiInstance = WikiContent.apiInstance;
+    if (apiInstance == null)
+    {
+        Logger.LogWarning("Wiki API is null - registration skipped.");
+        return;
+    }
+
+    // Try to find the RegisterPage method
+    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("OpenPage", [
+        typeof(string), typeof(string)
+    ]);
+
+    if (registerPageMethod == null)
+    {
+        Logger.LogWarning("OpenPage method not found.");
+        return;
+    }
+
+    // Call up OpenPage
+    registerPageMethod.Invoke(apiInstance, [
+        category,
+        pageName
+    ]);
+
+    Logger.LogInfo("Page successfully registered with the wiki.");
+}
+
+
+public static void OpenImagePage(string imagePath)
+{
+    object apiInstance = WikiContent.apiInstance;
+    if (apiInstance == null)
+    {
+        Logger.LogWarning("Wiki API is null - registration skipped.");
+        return;
+    }
+
+    // Try to find the OpenImage method
+    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("OpenImage", [typeof(string)]);
+
+    if (registerPageMethod == null)
+    {
+        Logger.LogWarning("OpenImage method not found.");
+        return;
+    }
+
+    // Call up OpenImage
+    registerPageMethod.Invoke(apiInstance, [imagePath]);
 }
 
 // Define the method that will draw your wiki page content
@@ -125,100 +198,191 @@ It is good practice to use your plugin's title to prevent duplicate categories. 
 Here's a complete example of how to register and implement a wiki page:
 
 ```csharp
+using System;
+using System.IO;
+using System.Reflection;
 using BepInEx;
+using BepInEx.Logging;
 using UnityEngine;
 
-[BepInPlugin("com.yourname.yourplugin", "Your Plugin", "1.1.0")]
-[BepInDependency("com.suit.hs2wiki", BepInDependency.DependencyFlags.HardDependency)]
-public class YourPlugin : BaseUnityPlugin
+namespace YourNamespace
 {
-    private Texture2D _exampleImage;
-
-    private void Awake()
+    [BepInPlugin("com.yourname.yourplugin", "Your Plugin Name", "1.0.0")]
+    public class YourPlugin : BaseUnityPlugin
     {
-        // Check if the Wiki plugin is available
-        if (WikiPlugin.PublicAPI != null)
+        internal static ManualLogSource Logger;
+
+        private void Awake()
         {
-            // Load your image
-            _exampleImage = LoadYourImage();
+            Logger = base.Logger;
+            Logger.LogInfo("Your plugin is loaded!");
+
+            // Register your wiki pages
+            RegisterWikiPage("YourPlugin/Features", "Basic Feature", DrawBasicFeaturePage);
+            RegisterWikiPage("YourPlugin/Features/Advanced", "Advanced Feature", DrawAdvancedFeaturePage);
             
-            // Register your wiki pages with categories and subcategories
-            RegisterWikiPage("YourPlugin", "Feature Guide", DrawWikiPage);
-            RegisterWikiPage("YourPlugin/Basics", "Getting Started", DrawBasicsPage);
-            RegisterWikiPage("YourPlugin/Advanced", "Advanced Techniques", DrawAdvancedPage);
+            // You can also open pages programmatically
+            // Example: When user clicks a help button in your GUI
+            // if (GUILayout.Button("Help")) 
+            //     OpenWikiPage("YourPlugin/Features", "Basic Feature");
         }
-    }
-    
-    private void RegisterWikiPage(string category, string pageName, Action drawPageAction)
-{
-    Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
-    if (wikiPluginType == null)
-    {
-        Logger.LogWarning("Wiki plugin not found - registration skipped.");
-        return;
-    }
 
-    // Try to find the PublicAPI field
-    FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
-    if (apiField == null)
-    {
-        Logger.LogWarning("Wiki API field not found - registration skipped.");
-        return;
-    }
-
-    object apiInstance = apiField.GetValue(null);
-    if (apiInstance == null)
-    {
-        Logger.LogWarning("Wiki API is null - registration skipped.");
-        return;
-    }
-
-    // Try to find the RegisterPage method
-    MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", new[] {
-        typeof(string), typeof(string), typeof(Action)
-    });
-
-    if (registerPageMethod == null)
-    {
-        Logger.LogWarning("RegisterPage method not found.");
-        return;
-    }
-
-    // Call up RegisterPage
-    registerPageMethod.Invoke(apiInstance, new object[] {
-        category,
-        pageName,
-        drawPageAction
-    });
-
-    Logger.LogInfo("Page successfully registered with the wiki.");
-}
-
-    private void DrawWikiPage()
-    {
-        GUILayout.Label("<b>Your Feature Guide</b>");
-        GUILayout.Space(10);
-        
-        GUILayout.Label("This is how to use your feature:");
-        GUILayout.Label("1. First step");
-        GUILayout.Label("2. Second step");
-        
-        if (GUILayout.Button("Show More Details"))
+        // Simple page with text
+        private void DrawBasicFeaturePage()
         {
-            // Handle button click
+            GUILayout.Label("<size=20><b>Basic Feature</b></size>");
+            GUILayout.Space(10);
+            GUILayout.Label("This feature allows you to do basic things in the game.");
+            GUILayout.Label("Follow these steps:");
+            
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("1. Open the menu");
+            GUILayout.Label("2. Select your options");
+            GUILayout.Label("3. Click Apply");
+            GUILayout.EndVertical();
+            
+            if (GUILayout.Button("Show Example Image"))
+            {
+                string imagePath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "example.png");
+                OpenImagePage(imagePath);
+            }
         }
         
-        if (_exampleImage != null)
+        // Advanced page with interactive elements
+        private void DrawAdvancedFeaturePage()
         {
-            GUILayout.Label("Screenshot:");
-            GUILayout.Box(_exampleImage, GUILayout.Width(300), GUILayout.Height(200));
+            GUILayout.Label("<size=20><b>Advanced Feature</b></size>");
+            GUILayout.Space(10);
+            
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("This feature has advanced settings you can customize:", GUILayout.Width(300));
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("• Multiple profiles");
+            GUILayout.Label("• Custom presets");
+            GUILayout.Label("• Advanced configuration");
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+            
+            GUILayout.Space(20);
+            
+            // Example of interactive elements
+            GUILayout.Label("Try the interactive demo:");
+            if (GUILayout.Button("Open Related Page"))
+            {
+                OpenWikiPage("YourPlugin/Features", "Basic Feature");
+            }
         }
-    }
-    
-    private Texture2D LoadYourImage()
-    {
-        // Your image loading code
-        // ...
+
+        #region Wiki API Integration
+        private static object apiInstance {
+            get{
+                Type wikiPluginType = Type.GetType("HS2Wiki.WikiPlugin, HS2Wiki");
+                if (wikiPluginType == null)
+                {
+                    Logger.LogWarning("Wiki plugin not found - registration skipped.");
+                    return null;
+                }
+
+                // Try to find the PublicAPI field
+                FieldInfo apiField = wikiPluginType.GetField("PublicAPI", BindingFlags.Public | BindingFlags.Static);
+                if (apiField == null)
+                {
+                    Logger.LogWarning("Wiki API field not found - registration skipped.");
+                    return null;
+                }
+
+                object apiInstance = apiField.GetValue(null);
+                if (apiInstance == null)
+                {
+                    Logger.LogWarning("Wiki API is null - registration skipped.");
+                    return null;
+                }
+                return apiInstance;
+            }
+        }
+
+        public static void RegisterWikiPage(string category, string pageName, Action drawPageAction)
+        {
+            object api = apiInstance;
+            if (apiInstance == null)
+            {
+                Logger.LogWarning("Wiki API is null - registration skipped.");
+                return;
+            }
+
+            // Try to find the RegisterPage method
+            MethodInfo registerPageMethod = apiInstance.GetType().GetMethod("RegisterPage", [
+                typeof(string), typeof(string), typeof(Action)
+            ]);
+
+            if (registerPageMethod == null)
+            {
+                Logger.LogWarning("RegisterPage method not found.");
+                return;
+            }
+
+            // Call the RegisterPage method
+            registerPageMethod.Invoke(apiInstance, [
+                category,
+                pageName,
+                drawPageAction
+            ]);
+
+            Logger.LogInfo($"Wiki page '{pageName}' registered in category '{category}'.");
+        }
+
+        public static void OpenWikiPage(string category, string pageName)
+        {
+            object api = apiInstance;
+            if (apiInstance == null)
+            {
+                Logger.LogWarning("Wiki API is null - cannot open page.");
+                return;
+            }
+
+            // Try to find the OpenPage method
+            MethodInfo openPageMethod = apiInstance.GetType().GetMethod("OpenPage", [
+                typeof(string), typeof(string)
+            ]);
+
+            if (openPageMethod == null)
+            {
+                Logger.LogWarning("OpenPage method not found.");
+                return;
+            }
+
+            // Call the OpenPage method
+            openPageMethod.Invoke(apiInstance, [
+                category,
+                pageName
+            ]);
+
+            Logger.LogInfo($"Opened wiki page '{pageName}' in category '{category}'.");
+        }
+
+        public static void OpenImagePage(string imagePath)
+        {
+            object api = apiInstance;
+            if (apiInstance == null)
+            {
+                Logger.LogWarning("Wiki API is null - cannot open image.");
+                return;
+            }
+
+            // Try to find the OpenImage method
+            MethodInfo openImageMethod = apiInstance.GetType().GetMethod("OpenImage", [typeof(string)]);
+
+            if (openImageMethod == null)
+            {
+                Logger.LogWarning("OpenImage method not found.");
+                return;
+            }
+
+            // Call the OpenImage method
+            openImageMethod.Invoke(apiInstance, [imagePath]);
+            Logger.LogInfo($"Opened image: {imagePath}");
+        }
+        #endregion
     }
 }
 ```
@@ -231,8 +395,12 @@ public class YourPlugin : BaseUnityPlugin
 - Include visual examples when possible
 - For complex features, consider adding step-by-step guides
 - Test your wiki pages to ensure they display correctly
+- Use OpenImagePage to show screenshots, diagrams, or other visual guides
+- Add navigation buttons between related pages using OpenWikiPage
+- Consider creating "See Also" sections that link to related wiki pages
+- For tutorials, use a combination of text instructions and image examples
 
-## Category Hierarchy
+## Category Hierarchy and Navigation
 
 The wiki now supports unlimited category nesting depth using the forward slash (/) as a separator:
 
@@ -241,6 +409,32 @@ The wiki now supports unlimited category nesting depth using the forward slash (
 - Nested subcategories: `"YourPlugin/Features/Advanced/Special"`
 
 Each level in the hierarchy is automatically displayed with proper indentation and can be expanded or collapsed independently. This allows for much better organization of complex documentation.
+
+### Persistent Foldout State
+
+The wiki remembers which categories were expanded or collapsed between sessions, providing users with a consistent navigation experience. The "Open All" and "Close All" buttons allow for quick navigation through the category tree.
+
+### Programmatic Navigation
+
+You can programmatically navigate between wiki pages using the OpenWikiPage method:
+
+```csharp
+// Open a specific wiki page
+OpenWikiPage("YourPlugin/Features", "YourFeaturePage");
+```
+
+When a page is opened programmatically, the category tree automatically expands to show the selected page.
+
+### Image Viewer
+
+Display images to users with the OpenImagePage method:
+
+```csharp
+// Open an image in the viewer
+OpenImagePage("path/to/your/image.png");
+```
+
+The image viewer will automatically scale images to fit the window while preserving aspect ratio. Users can move the image viewer independently of the main wiki window.
 
 ## License
 

@@ -1,23 +1,24 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
-using System.Xml;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HS2Wiki.api;
-using KKAPI;
 using KKAPI.Utilities;
 using UnityEngine;
 
 namespace HS2Wiki;
 
-[BepInPlugin("com.suit.hs2wiki", "HS2 Wiki", "1.1.0")]
+[BepInPlugin("com.suit.hs2wiki", "HS2 Wiki", "1.2.0")]
 [BepInProcess("StudioNEOV2")]
 public class WikiPlugin : BaseUnityPlugin
 {
     internal static new ManualLogSource Logger;
-    private Rect _windowRect = new Rect(100, 100, 1630, 720);
+    private Rect _windowRect = new(200, 200, 1730, 1000);
+    private Rect _imageRect = new(300, 300, 100, 100);
     private Vector2 _scrollPosition;
     private Vector2 _sidebarScrollPosition;
     private WikiAPI.PageInfo _selectedPage;
@@ -28,15 +29,17 @@ public class WikiPlugin : BaseUnityPlugin
 
     public static WikiAPI PublicAPI;
 
-    private Texture2D exampleImage;
-    private string imagePath = Path.Combine(Paths.PluginPath, "HS2Wiki", "example.png");
-
     private bool _uiShow;
     private bool _isResizing = false;
     private Vector2 _resizeStartPosition;
     private Vector2 _originalSize;
 
+    private Texture2D _image = null;
+
+    
+
     public static ConfigEntry<KeyboardShortcut> KeyGui { get; private set; }
+    private ConfigEntry<string> SavedFoldoutConfig { get; set; }
 
     private void Awake()
     {
@@ -44,26 +47,58 @@ public class WikiPlugin : BaseUnityPlugin
         Logger = base.Logger;
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
+        Init();
+
         // API initialisieren
         PublicAPI = new WikiAPI();
         PublicAPI.Initialize(this);
         Logger.LogInfo("Wiki API bereitgestellt!");
-
+    }
+    
+    private void Init() {
+        SavedFoldoutConfig = Config.Bind(
+                "General", "Saved FoldoutConfig",
+                string.Empty,
+                new ConfigDescription("List of saved foldout configs in JSON format.", null, "Advanced", new BrowsableAttribute(false)));
+        SavedFoldoutConfig.SettingChanged += (sender, args) => LoadFoldoutConfig();
+        LoadFoldoutConfig();
+    
         KeyGui = Config.Bind(
                 "Keyboard shortcuts", "Open Wiki",
                 new KeyboardShortcut(KeyCode.F3),
                 new ConfigDescription("Open the wiki window."));
-
-        if (File.Exists(imagePath))
-        {
-            byte[] data = File.ReadAllBytes(imagePath);
-            exampleImage = new Texture2D(2, 2);
-            exampleImage.LoadImage(data);
-        }
-
-        WikiPlugin.PublicAPI?.RegisterPage("Beispiele", "GUI-Demo", DrawDemoPage);
     }
-    
+
+    private void LoadFoldoutConfig() {
+        // Initialize _categoryFoldouts if it's null
+        _categoryFoldouts ??= [];
+        
+        if (!string.IsNullOrEmpty(SavedFoldoutConfig.Value))
+        {
+            string[] openFoldouts = SavedFoldoutConfig.Value.Split(',');
+            foreach (string foldout in openFoldouts)
+            {
+                if (!_categoryFoldouts.ContainsKey(foldout))
+                {
+                    _categoryFoldouts.Add(foldout, true);
+                }
+                else
+                {
+                    _categoryFoldouts[foldout] = true;
+                }
+            }
+        }
+    }
+
+    private void SaveFoldoutConfig() {
+        // Ensure _categoryFoldouts is initialized
+        if (_categoryFoldouts != null)
+        {
+            string[] openFoldouts = [.. _categoryFoldouts.Keys.Where(k => _categoryFoldouts[k])];
+            SavedFoldoutConfig.Value = string.Join(",", openFoldouts);
+        }
+    }
+
     // Kategoriebaum bei Bedarf neu erstellen
     public void RebuildCategoryTree()
     {
@@ -86,22 +121,116 @@ public class WikiPlugin : BaseUnityPlugin
     {
         if (_uiShow)
         {
-            _windowRect = GUILayout.Window(_uniqueId + 2, _windowRect, DrawWindow, "Wiki Panel");
+            string windowTitle = _selectedPage == null ? "HS2 Wiki" : $"HS2 Wiki - {_selectedPage.PageName}";
+            _windowRect = GUILayout.Window(_uniqueId + 2, _windowRect, DrawWindow, windowTitle);
+        }
+        if (_image != null)
+        {
+            // Use GUI.Window but capture returned position for dragging
+            Rect newRect = GUI.Window(_uniqueId + 3, _imageRect, DrawImageWindow, "Image");
+            // Only update position, not size
+            _imageRect.x = newRect.x;
+            _imageRect.y = newRect.y;
+        }
+    }
+
+    public void OpenImage(string path) 
+    {
+        Logger.LogInfo($"Trying to open image: {path}");
+        if (File.Exists(path))
+        {
+            byte[] data = File.ReadAllBytes(path);
+            _image = new Texture2D(2, 2);
+            _image.LoadImage(data);
+            _imageRect.width = _image.width * 3;
+            _imageRect.height = _image.height * 3;
+
+            // if the image is either too high or too wide based on the screen size, scale it down to make it fit
+            if (_image.width > Screen.width || _image.height > Screen.height)
+            {
+                float aspectRatio = (float)_image.width / _image.height;
+                if (_image.width > Screen.width)
+                {
+                    _imageRect.width = Screen.width;
+                    _imageRect.height = _imageRect.width / aspectRatio;
+                }
+                else if (_image.height > Screen.height)
+                {
+                    _imageRect.height = Screen.height;
+                    _imageRect.width = _imageRect.height * aspectRatio;
+                }
+            }
+        }
+    }
+
+    public void OpenPage(WikiAPI.PageInfo page)
+    {
+        if (_selectedPage != page)
+        {
+            OpenFoldoutsToPage(page.Category);
+            _selectedPage = page;
+            _scrollPosition = Vector2.zero;
+        }
+    }
+
+    private void OpenFoldoutsToPage(string category)
+    {
+        // Initialize _categoryFoldouts if it's null
+        _categoryFoldouts ??= [];
+        
+        string currentCategory = category;
+        _categoryFoldouts[currentCategory] = true;
+        while (currentCategory != null)
+        {
+            int lastSlashIndex = currentCategory.LastIndexOf('/');
+            if (lastSlashIndex >= 0)
+            {
+                currentCategory = currentCategory.Substring(0, lastSlashIndex);
+                _categoryFoldouts[currentCategory] = true;
+            }
+            else
+            {
+                break;
+            }
+        }
+        SaveFoldoutConfig();
+    }
+
+    private void OpenAllFoldouts()
+    {
+        foreach (var category in _categoryFoldouts.Keys)
+        {
+            _categoryFoldouts[category] = true;
+        }
+    }
+
+    private void CloseAllFoldouts()
+    {
+        foreach (var category in _categoryFoldouts.Keys)
+        {
+            _categoryFoldouts[category] = false;
         }
     }
 
     private void DrawWindow(int id)
     {
-        // Define resize button style
-        GUIStyle resizeButtonStyle = new GUIStyle(GUI.skin.button);
-        resizeButtonStyle.padding = new RectOffset(0, 0, 0, 0);
-        resizeButtonStyle.margin = new RectOffset(0, 0, 0, 0);
-        
+        // GUIStyle resizeButtonStyle = new(GUI.skin.button)
+        // {
+        //     padding = new RectOffset(0, 0, 0, 0),
+        //     margin = new RectOffset(0, 0, 0, 0)
+        // };
+
+        // Close button in top right
+        if (GUI.Button(new Rect(_windowRect.width - 25, 2, 20, 16), "x"))
+        {
+            _uiShow = false;
+        }
+
         GUILayout.BeginHorizontal();
 
         // Seitenleiste mit Kategorien
         // Fixed width vertical layout for the sidebar
-        GUILayout.BeginVertical(GUILayout.Width(300), GUILayout.ExpandHeight(true));
+        GUILayout.BeginVertical(GUILayout.Width(400), GUILayout.ExpandHeight(true));
         
         // Add a scrollview for the categories
         _sidebarScrollPosition = GUILayout.BeginScrollView(_sidebarScrollPosition, false, true, GUILayout.ExpandHeight(true));
@@ -110,25 +239,40 @@ public class WikiPlugin : BaseUnityPlugin
         GUILayout.BeginVertical(GUILayout.ExpandHeight(false));
         
         // Gruppieren nach Kategorie
-        var pagesByCategory = WikiPlugin.PublicAPI.GetPages()
+        var pagesByCategory = PublicAPI.GetPages()
             .GroupBy(p => p.Category)
             .ToDictionary(g => g.Key, g => g.ToList());
             
         // Die Faltungszustände werden jetzt in BuildCategoryTree() initialisiert
         
         // Style für Kategorie-Überschriften
-        GUIStyle categoryStyle = new GUIStyle(GUI.skin.GetStyle("foldout"));
-        categoryStyle.normal.textColor = Color.white;
-        categoryStyle.onNormal.textColor = Color.white;
-        categoryStyle.fontStyle = FontStyle.Bold;
-        categoryStyle.margin = new RectOffset(0, 0, 0, 0);
-        categoryStyle.padding = new RectOffset(0, 0, 0, 0);
-        
+        GUIStyle categoryStyle = new(GUI.skin.GetStyle("foldout"))
+        {
+            normal = { textColor = Color.white },
+            onNormal = { textColor = Color.white },
+            fontStyle = FontStyle.Bold,
+            margin = new RectOffset(0, 0, 0, 0),
+            padding = new RectOffset(0, 0, 0, 0)
+        };
+
         // Style for buttons to reduce padding
-        GUIStyle compactButton = new GUIStyle(GUI.skin.button);
-        compactButton.margin = new RectOffset(0, 0, 0, 0);
-        compactButton.padding = new RectOffset(5, 5, 2, 2);
-        
+        GUIStyle compactButton = new(GUI.skin.button)
+        {
+            margin = new RectOffset(0, 0, 0, 0),
+            padding = new RectOffset(5, 5, 2, 2)
+        };
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Open All"))
+        {
+            OpenAllFoldouts();
+        }
+        if (GUILayout.Button("Close All"))
+        {
+            CloseAllFoldouts();
+        }
+        GUILayout.EndHorizontal();
+
         // Zeige alle Hauptkategorien an
         if (_categoryTree != null)
         {
@@ -139,13 +283,13 @@ public class WikiPlugin : BaseUnityPlugin
             
             foreach (var rootCategory in rootCategories)
             {
-                DrawCategoryWithSubcategories(rootCategory, "", pagesByCategory, categoryStyle, compactButton, 0);
+                DrawCategoryWithSubcategories(rootCategory, pagesByCategory, categoryStyle, compactButton, 0);
             }
         }
         else
         {
             // Falls der Kategoriebaum noch nicht initialisiert wurde
-            GUILayout.Label("Keine Kategorien gefunden oder Baum wurde noch nicht initialisiert.");
+            GUILayout.Label("No categories found or tree has not yet been initialized.");
         }
         
         GUILayout.FlexibleSpace();
@@ -158,25 +302,32 @@ public class WikiPlugin : BaseUnityPlugin
         // Page Content
         GUILayout.BeginVertical();
         _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
-        _selectedPage?.PageContentCallback?.Invoke();
+        if (_selectedPage != null)
+        {
+            _selectedPage.PageContentCallback?.Invoke();
+        }
+        else
+        {
+            GUILayout.Label("No page selected.");
+        }
         GUILayout.EndScrollView();
         GUILayout.EndVertical();
 
         GUILayout.EndHorizontal();
         
-        // Draw resize button in the bottom-right corner
-        Rect resizeBtnRect = new Rect(_windowRect.width - 20, _windowRect.height - 20, 16, 16);
-        GUI.Box(resizeBtnRect, "↘", resizeButtonStyle);
+        // // Draw resize button in the bottom-right corner
+        // Rect resizeBtnRect = new(_windowRect.width - 20, _windowRect.height - 20, 16, 16);
+        // GUI.Box(resizeBtnRect, "↘", resizeButtonStyle);
         
-        // Handle resize button dragging
-        HandleResizeButton(resizeBtnRect);
+        // // Handle resize button dragging
+        // HandleResizeButton(resizeBtnRect, ref _windowRect);
         
         // Only use DragWindow for the title bar area
         GUI.DragWindow(new Rect(0, 0, _windowRect.width, 20));
         IMGUIUtils.EatInputInRect(_windowRect);
     }
 
-    private void HandleResizeButton(Rect resizeBtnRect)
+    private void HandleResizeButton(Rect resizeBtnRect, ref Rect windowRect)
     {
         Event currentEvent = Event.current;
         Vector2 mousePos = currentEvent.mousePosition;
@@ -188,7 +339,7 @@ public class WikiPlugin : BaseUnityPlugin
                 {
                     _isResizing = true;
                     _resizeStartPosition = mousePos;
-                    _originalSize = new Vector2(_windowRect.width, _windowRect.height);
+                    _originalSize = new Vector2(windowRect.width, windowRect.height);
                     currentEvent.Use();
                 }
                 break;
@@ -209,8 +360,8 @@ public class WikiPlugin : BaseUnityPlugin
                     float height = Mathf.Max(200, _originalSize.y + (mousePos.y - _resizeStartPosition.y));
                     
                     // Apply the new size
-                    _windowRect.width = width;
-                    _windowRect.height = height;
+                    windowRect.width = width;
+                    windowRect.height = height;
                     
                     currentEvent.Use();
                 }
@@ -221,13 +372,10 @@ public class WikiPlugin : BaseUnityPlugin
     // Baut eine Baumstruktur aus den Kategorien auf
     private void BuildCategoryTree(Dictionary<string, List<WikiAPI.PageInfo>> pagesByCategory)
     {
-        _categoryTree = new Dictionary<string, List<string>>();
+        _categoryTree = [];
         
         // Initialisiere die Faltouts für alle Kategorien, wenn sie noch nicht existieren
-        if (_categoryFoldouts == null)
-        {
-            _categoryFoldouts = new Dictionary<string, bool>();
-        }
+        _categoryFoldouts ??= [];
         
         // Alle Kategorien durchlaufen und die Hierarchie aufbauen
         foreach (var fullCategory in pagesByCategory.Keys)
@@ -235,7 +383,7 @@ public class WikiPlugin : BaseUnityPlugin
             // Stellen Sie sicher, dass die Kategorie im Faltout-Dictionary existiert
             if (!_categoryFoldouts.ContainsKey(fullCategory))
             {
-                _categoryFoldouts[fullCategory] = true; // Standardmäßig ausgeklappt
+                _categoryFoldouts[fullCategory] = false; // Standardmäßig ausgeklappt
             }
             
             // Alle Teile der Kategoriehierarchie verarbeiten
@@ -255,7 +403,7 @@ public class WikiPlugin : BaseUnityPlugin
                 // Stellen Sie sicher, dass der aktuelle Pfad im Baum existiert
                 if (!_categoryTree.ContainsKey(currentPath))
                 {
-                    _categoryTree[currentPath] = new List<string>();
+                    _categoryTree[currentPath] = [];
                 }
                 
                 // Stellen Sie sicher, dass der aktuelle Pfad im Faltout-Dictionary existiert
@@ -274,19 +422,22 @@ public class WikiPlugin : BaseUnityPlugin
     }
     
     // Zeichnet eine Kategorie mit all ihren Unterkategorien rekursiv
-    private void DrawCategoryWithSubcategories(string category, string displayName, 
+    private void DrawCategoryWithSubcategories(string category,
         Dictionary<string, List<WikiAPI.PageInfo>> pagesByCategory, 
         GUIStyle categoryStyle, GUIStyle buttonStyle, int indentLevel)
     {
-        // Wenn ein Anzeigename angegeben wurde, verwenden Sie diesen, andernfalls den Kategorienamen
-        string categoryName = string.IsNullOrEmpty(displayName) ? category : displayName;
+        // Initialize _categoryFoldouts if it's null
+        _categoryFoldouts ??= [];
+        
+        // Ensure this category exists in the dictionary
+        if (!_categoryFoldouts.ContainsKey(category))
+        {
+            _categoryFoldouts[category] = false;
+        }
         
         // Den letzten Teil des Kategoriepfads extrahieren, wenn es sich um einen verschachtelten Pfad handelt
-        if (string.IsNullOrEmpty(displayName))
-        {
-            string[] parts = category.Split('/');
-            categoryName = parts[parts.Length - 1];
-        }
+        string[] parts = category.Split('/');
+        string categoryName = parts[parts.Length - 1];
         
         // Einrückung basierend auf der Ebene
         GUILayout.BeginVertical(GUI.skin.box);
@@ -294,10 +445,12 @@ public class WikiPlugin : BaseUnityPlugin
         GUILayout.Space(indentLevel * 15); // 15 Pixel Einrückung pro Ebene
         
         // Faltbarer Header mit Pfeilsymbol für die Kategorie
-        _categoryFoldouts[category] = GUILayout.Toggle(
-            _categoryFoldouts[category], 
-            (_categoryFoldouts[category] ? "▼ " : "► ") + categoryName,
-            categoryStyle, GUILayout.ExpandWidth(true));
+        bool isFoldoutOpen = _categoryFoldouts[category];
+        _categoryFoldouts[category] = GUILayout.Toggle(isFoldoutOpen, isFoldoutOpen ? "▼ " + categoryName : "► " + categoryName, categoryStyle, GUILayout.ExpandWidth(true));
+        if (isFoldoutOpen != _categoryFoldouts[category])
+        {
+            SaveFoldoutConfig();
+        }
             
         GUILayout.EndHorizontal();
             
@@ -313,9 +466,18 @@ public class WikiPlugin : BaseUnityPlugin
                 
                 foreach (var page in pagesByCategory[category])
                 {
-                    if (GUILayout.Button(page.PageName, buttonStyle, GUILayout.ExpandWidth(true)))
+                    var style = new GUIStyle(buttonStyle);
+                    if (page == _selectedPage)
                     {
-                        _selectedPage = page;
+                        style.normal.textColor = Color.yellow;
+                    }
+                    if (GUILayout.Button(page.PageName, style, GUILayout.ExpandWidth(true)))
+                    {
+                        if (page != _selectedPage)
+                        {
+                            _selectedPage = page;
+                            _scrollPosition = Vector2.zero;
+                        }
                     }
                 }
                 
@@ -328,7 +490,7 @@ public class WikiPlugin : BaseUnityPlugin
             {
                 foreach (var subCategory in _categoryTree[category].OrderBy(c => c))
                 {
-                    DrawCategoryWithSubcategories(subCategory, null, pagesByCategory, categoryStyle, buttonStyle, indentLevel + 1);
+                    DrawCategoryWithSubcategories(subCategory, pagesByCategory, categoryStyle, buttonStyle, indentLevel + 1);
                 }
             }
         }
@@ -341,41 +503,54 @@ public class WikiPlugin : BaseUnityPlugin
         GUILayout.EndVertical();
     }
 
-    private void DrawDemoPage()
-    {
-        GUILayout.Label("<b>This is an example page for the wiki.</b>");
-        GUILayout.Space(10);
+    public void DrawImageWindow(int id) {
+        // GUIStyle resizeButtonStyle = new(GUI.skin.button)
+        // {
+        //     padding = new RectOffset(0, 0, 0, 0),
+        //     margin = new RectOffset(0, 0, 0, 0)
+        // };
 
-        GUILayout.Label("You can:");
-        GUILayout.Label("✅ Show text");
-        GUILayout.Label("✅ Use buttons");
-        GUILayout.Label("✅ Use scrollable content");
-        GUILayout.Label("✅ Show images");
-
-        GUILayout.Space(10);
-
-        if (GUILayout.Button("Click me!"))
+        // Close button in top right
+        if (GUI.Button(new Rect(_imageRect.width - 25, 2, 20, 16), "x"))
         {
-            Logger.LogInfo("Button was clicked in the example page!");
+            _image = null;
         }
 
-        GUILayout.Space(20);
-        GUILayout.Label("Image example:");
-
-        if (exampleImage != null)
-        {
-            GUILayout.Box(exampleImage, GUILayout.Width(200), GUILayout.Height(200));
+        // Calculate the available space for the image (accounting for window borders and padding)
+        float availableWidth = _imageRect.width - 10;  // 5px padding on each side
+        float availableHeight = _imageRect.height - 25; // Account for title bar and padding
+        
+        // Calculate aspect ratio to maintain proportions
+        float aspectRatio = (float)_image.width / _image.height;
+        float displayWidth, displayHeight;
+        
+        // Determine dimensions that fit within the available space while maintaining aspect ratio
+        if (availableWidth / aspectRatio <= availableHeight) {
+            // Width constrained
+            displayWidth = availableWidth;
+            displayHeight = availableWidth / aspectRatio;
+        } else {
+            // Height constrained
+            displayHeight = availableHeight;
+            displayWidth = availableHeight * aspectRatio;
         }
-        else
-        {
-            GUILayout.Label("No image found. Place a PNG file under:");
-            GUILayout.Label(imagePath);
-        }
+        
+        // Calculate the centered position for the image
+        float leftMargin = (_imageRect.width - displayWidth) * 0.5f;
+        float topMargin = 20 + (availableHeight - displayHeight) * 0.5f;
+        
+        // Draw the texture directly with scaling
+        Rect imageRect = new(leftMargin, topMargin, displayWidth, displayHeight);
+        GUI.DrawTexture(imageRect, _image, ScaleMode.StretchToFill);
+        
+        // // Draw resize button in the bottom-right corner
+        // Rect resizeBtnRect = new(_imageRect.width - 20, _imageRect.height - 20, 16, 16);
+        // GUI.Box(resizeBtnRect, "↘", resizeButtonStyle);
+        
+        // // Handle resize button dragging
+        // HandleResizeButton(resizeBtnRect, ref _imageRect);
 
-        GUILayout.Space(10);
-
-        GUILayout.Label("🎞️ Video or GIFs in Unity GUI are more difficult...");
-        GUILayout.Label("Use an external plugin or HTML/asset browser window if necessary.");
+        GUI.DragWindow(new Rect(0, 0, _imageRect.width, _imageRect.height));
+        IMGUIUtils.EatInputInRect(_imageRect);
     }
-
 }

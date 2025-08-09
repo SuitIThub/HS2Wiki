@@ -24,6 +24,20 @@ namespace HS2Wiki.api
             _plugin = plugin;
         }
 
+        public void OpenImage(string path)
+        {
+            _plugin?.OpenImage(path);
+        }
+
+        public void OpenPage(string category, string name)
+        {
+            var page = _pages.FirstOrDefault(p => p.Category == category && p.PageName == name);
+            if (page != null)
+            {
+                _plugin?.OpenPage(page);
+            }
+        }
+
         public void RegisterPage(string category, string name, Action contentCallback)
         {
             _pages.Add(new PageInfo
