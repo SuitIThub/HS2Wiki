@@ -1,12 +1,13 @@
 # HS2 Wiki Plugin
 
 [![Latest Release](https://img.shields.io/github/v/release/SuitIThub/HS2Wiki)](https://github.com/SuitIThub/HS2Wiki/releases/latest)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/SuitIThub/HS2Wiki/LICENSE)
 [![BepInEx](https://img.shields.io/badge/BepInEx-5.4.22-green)](https://github.com/BepInEx/BepInEx)
 
 A plugin for Honey Select 2 that provides an in-game wiki system. This plugin allows other plugins to register and display wiki pages to help users understand game features.
 
 ![HS2 Wiki Screenshot](example.png)
+![HS2 Wiki Screenshot](example2.png)
 
 ## Features
 
