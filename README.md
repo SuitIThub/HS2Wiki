@@ -40,9 +40,12 @@ Use the public API to register your wiki pages. The simplest approach is:
 RegisterWikiPage("Your Category", "Your Page Name", YourDrawPageMethod);
 // For subcategories, use a forward slash separator
 RegisterWikiPage("Your Category/Subcategory", "Your Page Name", YourDrawPageMethod);
+// You can go as deep as you like
+RegisterWikiPage("Your Category/Subcategory/SubSubcategory", "Your Page Name", YourDrawPageMethod);
 
 // You can also programmatically open wiki pages
 OpenWikiPage("Your Category", "Your Page Name");
+OpenWikiPage("Your Category/Subcategory", "Your Page Name");
 
 // And display images in a resizable, draggable viewer
 OpenImagePage("path/to/your/image.png");
