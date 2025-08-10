@@ -246,7 +246,7 @@ public class WikiPlugin : BaseUnityPlugin
         // Die Faltungszustände werden jetzt in BuildCategoryTree() initialisiert
         
         // Style für Kategorie-Überschriften
-        GUIStyle categoryStyle = new(GUI.skin.GetStyle("foldout"))
+        GUIStyle categoryStyle = new(GUI.skin.label)
         {
             normal = { textColor = Color.white },
             onNormal = { textColor = Color.white },
