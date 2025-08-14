@@ -22,7 +22,9 @@ A plugin for Honey Select 2 that provides an in-game wiki system. This plugin al
 ## Installation
 
 1. Ensure you have [BepInEx](https://github.com/BepInEx/BepInEx) installed
-2. Place the `HS2Wiki.dll` in your `BepInEx/plugins` folder
+2. Download the [Latest Release](https://github.com/SuitIThub/HS2Wiki/releases/latest)
+3. Place the contents of the zip in your Honey Select 2 root folder. (The `HS2Wiki.dll` should then lie in "Honey Select 2/BepInEx/plugins/HS2Wiki")
+4. (Optional) Get the [Latest Release](https://github.com/SuitIThub/HS2Wiki-Content-Pack) of the HS2Wiki-ContentPack
 
 ## Usage
 
