@@ -30,7 +30,7 @@ Press F3 (configurable) to open the wiki panel.
 
 ## For Plugin Developers: How to Register Wiki Pages
 
-You can add your own wiki pages to the central wiki system by following these steps:
+You can add your own wiki pages to the central wiki system by following these steps in your own plugin:
 
 ### 1. Register your wiki page
 
