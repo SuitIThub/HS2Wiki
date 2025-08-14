@@ -215,6 +215,8 @@ namespace YourNamespace
     public class YourPlugin : BaseUnityPlugin
     {
         internal static ManualLogSource Logger;
+        private void Texture2D example_image;
+        private void string example_image_path;
 
         private void Awake()
         {
@@ -229,6 +231,14 @@ namespace YourNamespace
             // Example: When user clicks a help button in your GUI
             // if (GUILayout.Button("Help")) 
             //     OpenWikiPage("YourPlugin/Features", "Basic Feature");
+
+            example_image_path = Path.Combine(Paths.PluginPath, "Your Plugin Folder", "example_image.png")
+            example_image = null;
+            if (File.Exists(imagePath)) {
+                byte[] data = File.ReadAllBytes(example_image_path);
+                example_image = new Texture2D(2, 2);
+                example_image.LoadImage(data)
+            }
         }
 
         // Simple page with text
@@ -245,10 +255,9 @@ namespace YourNamespace
             GUILayout.Label("3. Click Apply");
             GUILayout.EndVertical();
             
-            if (GUILayout.Button("Show Example Image"))
+            if (GUILayout.Button(example_image, GUI.skin.Box, GUILayout.Width(example_image.width), GUILayout.Height(example_image.height)))
             {
-                string imagePath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "example.png");
-                OpenImagePage(imagePath);
+                OpenImagePage(example_image_path);
             }
         }
         
