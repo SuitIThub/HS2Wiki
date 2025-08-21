@@ -33,6 +33,7 @@ Press F3 (configurable) to open the wiki panel.
 ## For Plugin Developers: How to Register Wiki Pages
 
 You can add your own wiki pages to the central wiki system by following these steps in your own plugin:
+(The registering code below is built, so that your plugin still works even if HS2Wiki is not installed.)
 
 ### 1. Register your wiki page
 
